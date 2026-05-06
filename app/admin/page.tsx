@@ -80,10 +80,10 @@ export default function AdminPanel() {
         .eq('id', app.id);
       if (appErr) throw appErr;
 
-      // 2. Update user's status to active in users table (matched by email)
+      // 2. Update user's status to active AND role to shopkeeper in users table (matched by email)
       const { error: userErr } = await insforge.database
         .from('users')
-        .update({ status: 'active' })
+        .update({ status: 'active', role: 'shopkeeper' })
         .eq('email', app.email);
       if (userErr) throw userErr;
 

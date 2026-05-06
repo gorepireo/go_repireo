@@ -48,8 +48,20 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       const { data, error } = await insforge.auth.getCurrentUser();
       if (data?.user) {
         setUser(data.user);
+        // Fetch auth profile as base
         const { data: profileData } = await insforge.auth.getProfile(data.user.id);
-        setProfile(profileData as any);
+        // Override role/status from the users table (source of truth for admin approval)
+        // Use email (text) not id (uuid) to avoid "operator does not exist: uuid = text"
+        const { data: usersRow } = await insforge.database
+          .from('users')
+          .select('role, status')
+          .eq('email', data.user.email)
+          .maybeSingle();
+        const merged = {
+          ...(profileData as any),
+          ...(usersRow ? { role: (usersRow as any).role, status: (usersRow as any).status } : {}),
+        };
+        setProfile(merged as any);
       } else {
         setUser(null);
         setProfile(null);

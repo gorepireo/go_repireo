@@ -3,14 +3,17 @@
 import { useState, useEffect, Suspense } from 'react';
 import { insforge } from '@/lib/insforge';
 import { useAuth } from '@/context/AuthContext';
+import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Plus, Edit, Trash2, Package, DollarSign, ShoppingBag, X, Tag, Info, ArrowUpRight } from 'lucide-react';
 
 function ShopkeeperDashboardContent() {
   const { user, profile, loading: authLoading } = useAuth();
+  const router = useRouter();
   const [products, setProducts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [isAdding, setIsAdding] = useState(false);
+  const [addError, setAddError] = useState('');
   const [newProduct, setNewProduct] = useState({ name: '', price: '', category: 'equipment' });
 
   useEffect(() => {
@@ -23,7 +26,7 @@ function ShopkeeperDashboardContent() {
         const { data } = await insforge.database
           .from('products')
           .select('*')
-          .eq('shop_id', user.id);
+          .filter('shop_id::text', 'eq', user.id);
         if (data) setProducts(data);
       } catch (err) {
         console.error('Failed to load products', err);
@@ -34,15 +37,26 @@ function ShopkeeperDashboardContent() {
     if (!authLoading) fetchProducts();
   }, [user, authLoading]);
 
+  // Role guard — redirect non-shopkeepers away
+  useEffect(() => {
+    if (!authLoading && user && profile && profile.role !== 'shopkeeper' && profile.role !== 'admin') {
+      router.replace('/');
+    }
+  }, [user, profile, authLoading, router]);
+
   const handleAddProduct = async (e: React.FormEvent) => {
     e.preventDefault();
+    setAddError('');
     const { error } = await insforge.database
       .from('products')
       .insert({ ...newProduct, shop_id: user.id });
     if (!error) {
       setIsAdding(false);
-      const { data } = await insforge.database.from('products').select('*').eq('shop_id', user.id);
+      setNewProduct({ name: '', price: '', category: 'equipment' });
+      const { data } = await insforge.database.from('products').select('*').filter('shop_id::text', 'eq', user.id);
       if (data) setProducts(data);
+    } else {
+      setAddError(error.message || 'Failed to add product. Check database permissions.');
     }
   };
 
@@ -225,10 +239,13 @@ function ShopkeeperDashboardContent() {
                         </div>
                       </div>
 
-                      <button type="submit" className="btn-primary w-full h-20 text-[11px] group">
-                        Authorize Submission
-                        <Plus className="ml-3 group-hover:rotate-90 transition-transform" />
-                      </button>
+                       {addError && (
+                         <p className="text-[#FF3B30] text-[10px] font-bold uppercase tracking-widest p-4 bg-red-50 rounded-2xl">{addError}</p>
+                       )}
+                       <button type="submit" className="btn-primary w-full h-20 text-[11px] group">
+                         Authorize Submission
+                         <Plus className="ml-3 group-hover:rotate-90 transition-transform" />
+                       </button>
                    </form>
                  </div>
               </motion.div>
